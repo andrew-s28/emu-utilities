@@ -95,7 +95,7 @@ class EMUAdjointGradient(EMU):
         )
 
         mask = xr.DataArray(
-            data=llc_compact_to_tiles(self.hfacc[0]),
+            data=llc_compact_to_tiles(self.hfacc[0], less_output=True),
             dims=["tile", "j", "i"],
             coords={
                 "tile": np.arange(self.ntiles),

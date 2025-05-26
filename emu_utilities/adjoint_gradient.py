@@ -59,24 +59,32 @@ class EMUAdjointGradient(EMU):
     def get_control_metadata(self, variable: str) -> dict:
         metadata = {
             "units": "unknown",
-            "short_name": variable,
+            "short_name": "unknown",
         }
         if variable == "empmr":
             metadata["units"] = "kg/m^2/s"
+            metadata["short_name"] = "upward_freshwater_flux"
         elif variable == "pload":
             metadata["units"] = "kg/m^2/s"
+            metadata["short_name"] = "downward_surface_pressure_loading"
         elif variable == "qnet":
             metadata["units"] = "W/m^2"
+            metadata["short_name"] = "net_upward_heat_flux"
         elif variable == "qsw":
             metadata["units"] = "W/m^2"
+            metadata["short_name"] = "net_upward_shortwave_radiation"
         elif variable == "saltflux":
             metadata["units"] = "kg/m^2/s"
+            metadata["short_name"] = "net_upward_salt_flux"
         elif variable == "spflx":
             metadata["units"] = "W/m^2"
+            metadata["short_name"] = "net_downward_salt_plume_flux"
         elif variable == "tauu":
             metadata["units"] = "N/m^2"
+            metadata["short_name"] = "eastward_surface_stress"
         elif variable == "tauv":
             metadata["units"] = "N/m^2"
+            metadata["short_name"] = "northward_surface_stress"
         return metadata
 
     def make_adjoint_gradient_dataset(self) -> xr.Dataset:
@@ -122,20 +130,3 @@ def load_adjoint_gradient(run_directory: str) -> xr.Dataset:
     emu = EMUAdjointGradient(run_directory)
     adj_ds = emu.make_adjoint_gradient_dataset()
     return adj_ds
-    # adj_files = list(emu.directory.glob("output/adj.out_*"))
-    # nrec = int(re.findall(r"\d+", adj_files[0].name)[0])
-
-    # with open(adj_files[0], "rb") as f:
-    #     adj_data = np.fromfile(f, dtype=">f4", count=nrec)
-    #     adj_mean = np.fromfile(f, dtype=">f4", count=1)[0]
-
-    # step_files = list(emu.directory.glob("output/adj.step_*"))
-
-    # with open(step_files[0], "rb") as f:
-    #     adj_hr = np.fromfile(f, dtype=">i4", count=nrec)
-
-    # adj_dt = datetime(1992, 1, 1, 0) + np.array([timedelta(hours=float(hr)) for hr in adj_hr])
-
-    # adj_ds = emu.make_adjoint_gradient_dataset(adj_data, adj_mean, adj_dt)
-
-    # return adj_ds

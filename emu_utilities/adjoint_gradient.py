@@ -112,7 +112,7 @@ class EMUAdjointGradient(EMU):
             },
         )
 
-        adj_ds = adj_ds.where(mask > 0, drop=True)
+        adj_ds = adj_ds.where(mask > 0)
 
         adj_ds.attrs["created"] = str(datetime.now().isoformat())
         adj_ds.attrs["run_name"] = self.run_name

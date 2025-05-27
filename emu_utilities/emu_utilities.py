@@ -42,16 +42,16 @@ class EMU:
             raise ValueError(f"EMU tool not recognized from directory name: {self.run_name}")
 
     def set_variable(self):
-        if self.tool == "samp":
-            if "_1_" in self.run_name:
+        if self.tool == "samp" or self.tool == "atrb":
+            if "m_1_" in self.run_name or "d_1_" in self.run_name:
                 self.variable = "SSH"
-            elif "_2_" in self.run_name:
+            elif "m_2_" in self.run_name or "d_2_" in self.run_name:
                 self.variable = "OBP"
-            elif "_3_" in self.run_name:
+            elif "m_3_" in self.run_name or "d_3_" in self.run_name:
                 self.variable = "THETA"
-            elif "_4_" in self.run_name:
+            elif "m_4_" in self.run_name or "d_4_" in self.run_name:
                 self.variable = "SALT"
-            elif "_5_" in self.run_name:
+            elif "m_5_" in self.run_name or "d_5_" in self.run_name:
                 self.variable = "UV"
             else:
                 raise ValueError(f"EMU variable not recognized from directory name: {self.run_name}")
@@ -70,7 +70,7 @@ class EMU:
                 raise ValueError(f"EMU variable not recognized from directory name: {self.run_name}")
 
     def set_units(self):
-        if self.tool == "samp" or self.tool == "adj":
+        if self.tool == "samp" or self.tool == "adj" or self.tool == "atrb":
             if self.variable == "SSH":
                 self.units = "m"
             elif self.variable == "OBP":
@@ -85,7 +85,7 @@ class EMU:
                 raise ValueError(f"Units not defined for variable: {self.variable}")
 
     def set_short_name(self):
-        if self.tool == "samp" or self.tool == "adj":
+        if self.tool == "samp" or self.tool == "adj" or self.tool == "atrb":
             if self.variable == "SSH":
                 self.short_name = "sea_surface_height"
             elif self.variable == "OBP":
@@ -105,12 +105,14 @@ class EMU:
         self.ny = 1170
         self.nr = 50
         self.ntiles = 13
-        self.xc = self.set_grid_data("XC.data", (self.ny, self.nx))
-        self.yc = self.set_grid_data("YC.data", (self.ny, self.nx))
+        self.xc = llc_compact_to_tiles(self.set_grid_data("XC.data", (self.ny, self.nx)))
+        self.yc = llc_compact_to_tiles(self.set_grid_data("YC.data", (self.ny, self.nx)))
         self.rc = self.set_grid_data("RC.data", (self.nr,))
-        self.hfacc = self.set_grid_data("hFacC.data", (self.nr, self.ny, self.nx))
-        self.hfacw = self.set_grid_data("hFacW.data", (self.nr, self.ny, self.nx))
-        self.hfacs = self.set_grid_data("hFacS.data", (self.nr, self.ny, self.nx))
+        self.xg = llc_compact_to_tiles(self.set_grid_data("XG.data", (self.ny, self.nx)))
+        self.yg = llc_compact_to_tiles(self.set_grid_data("YG.data", (self.ny, self.nx)))
+        self.hfacc = llc_compact_to_tiles(self.set_grid_data("hFacC.data", (self.nr, self.ny, self.nx)))
+        self.hfacw = llc_compact_to_tiles(self.set_grid_data("hFacW.data", (self.nr, self.ny, self.nx)))
+        self.hfacs = llc_compact_to_tiles(self.set_grid_data("hFacS.data", (self.nr, self.ny, self.nx)))
 
     def set_grid_data(self, filename: str, dimensions: tuple):
         with files("emu_utilities.grid_data").joinpath(filename).open("rb") as f:

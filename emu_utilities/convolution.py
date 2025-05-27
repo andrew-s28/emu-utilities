@@ -74,9 +74,9 @@ class EMUColvolution(EMU):
         if nlags == 0:
             raise ValueError(f"No records found for variable '{variable}' in file: {conv_files[0]}")
         conv_data = conv_data.reshape((nlags, self.ny, self.nx))
-        if variable in ["tauu", "tauv"]:
-            # convert to northward and eastward components
-            conv_data = -conv_data
+        # if variable in ["tauu", "tauv"]:
+        #     # convert to northward and eastward components
+        #     conv_data = conv_data
         return conv_data
 
     def set_controls(self):

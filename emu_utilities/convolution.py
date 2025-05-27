@@ -178,7 +178,7 @@ class EMUColvolution(EMU):
         conv_ds = xr.Dataset(
             data_vars=data_vars,
             coords={
-                "lag": np.arange(self.nlags - 1, -1, -1),
+                "lag": np.arange(self.nlags),
                 "time": self.dt,
             },
         )

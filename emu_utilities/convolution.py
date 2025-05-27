@@ -137,6 +137,9 @@ class EMUColvolution(EMU):
 
     def make_2d_conv_gradient_dataset(self) -> xr.Dataset:
         data_vars = {var: (["time", "tile", "j", "i"], getattr(self, var)) for var in self.controls}
+        data_vars.update(
+            {"sum": (["time", "tile", "j", "i"], self.sum)},
+        )
 
         conv_ds = xr.Dataset(
             data_vars=data_vars,

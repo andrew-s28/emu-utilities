@@ -215,7 +215,7 @@ def resample_to_latlon(
     return new_grid_lon_centers, new_grid_lat_centers, new_grid_lon_edges, new_grid_lat_edges, data_latlon_projection
 
 
-def llc_compact_to_tiles(data_compact, less_output=False):
+def llc_compact_to_tiles(data_compact, less_output=True):
     """
 
     Converts a numpy binary array in the 'compact' format of the

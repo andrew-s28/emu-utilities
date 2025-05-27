@@ -8,13 +8,15 @@ from numpy._typing._array_like import NDArray
 from .emu_utilities import EMU
 from .resample import llc_compact_to_tiles
 
+CONTROLS = ["empmr", "pload", "qnet", "qsw", "saltflux", "spflx", "tauu", "tauv"]
+
 
 class EMUColvolution(EMU):
     def __init__(self, directory: str, dims: int) -> None:
         super().__init__(directory)
         if self.tool != "conv":
             raise ValueError(f"Expected EMU tool 'conv', but got '{self.tool}' from directory: {self.run_name}")
-        self.controls = ["empmr", "pload", "qnet", "qsw", "saltflux", "spflx", "tauu", "tauv"]
+        self.controls = CONTROLS
         self.dims = dims
         self.nweeks = 1357
         self.set_conv_info()
@@ -212,3 +214,81 @@ def load_2d_conv_gradient(run_directory: str) -> xr.Dataset:
     emu = EMUColvolution(run_directory, dims=2)
     conv_ds = emu.make_2d_conv_gradient_dataset()
     return conv_ds
+
+
+def lagged_variance(conv_ds: xr.Dataset, variable: str) -> xr.DataArray:
+    if (
+        variable not in conv_ds.data_vars
+        or "sum" not in conv_ds.data_vars
+        or "lag" not in conv_ds.dims
+        or "time" not in conv_ds.dims
+    ):
+        raise ValueError(
+            f"Incorrect dataset structure for variable '{variable}'. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+        )
+    lags = conv_ds["lag"].data
+    if lags.size == 0:
+        raise ValueError(f"No lags found in dataset for variable '{variable}'.")
+    if "lag" not in conv_ds[variable].dims or "time" not in conv_ds[variable].dims:
+        raise ValueError(
+            f"Incorrect dimensions on {variable}. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+        )
+    ev_lag_arr = np.full((len(conv_ds["lag"]),), np.nan)
+    for i, lag in enumerate(conv_ds["lag"]):
+        diff = conv_ds["sum"].isel(lag=-1) - conv_ds[variable].sel(lag=lag)
+        ev_lag_arr[i] = 1 - calc_variance(diff) / calc_variance(conv_ds["sum"].isel(lag=-1))
+
+    ev_lag = xr.DataArray(
+        data=ev_lag_arr,
+        dims=["lag"],
+        coords={"lag": conv_ds["lag"].data},
+        attrs={
+            "units": "1",
+            "long_name": f"lagged explained variance for {variable}",
+            "short_name": f"ev_{variable}",
+        },
+    )
+    return ev_lag
+
+
+def ctrl_variance(conv_ds: xr.Dataset, lag: int = -1) -> xr.DataArray:
+    for ctrl in CONTROLS:
+        if ctrl not in conv_ds.data_vars:
+            raise ValueError(
+                f"Control variable '{ctrl}' not found in dataset. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+            )
+    if "sum" not in conv_ds.data_vars or "lag" not in conv_ds.dims or "time" not in conv_ds.dims:
+        raise ValueError(
+            "Incorrect dataset structure. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+        )
+    ev_ctrl_arr = np.full((len(list(conv_ds.keys())) - 1,), np.nan)
+    for i, data_var in enumerate(conv_ds.keys()):
+        if data_var != "sum":
+            if lag == -1:
+                diff = conv_ds["sum"].isel(lag=lag) - conv_ds[data_var].isel(lag=lag)
+                ev_ctrl_arr[i] = 1 - calc_variance(diff) / calc_variance(conv_ds["sum"].isel(lag=lag))
+            else:
+                diff = conv_ds["sum"].sel(lag=lag) - conv_ds[data_var].sel(lag=lag)
+                ev_ctrl_arr[i] = 1 - calc_variance(diff) / calc_variance(conv_ds["sum"].sel(lag=lag))
+
+    ev_ctrl = xr.DataArray(
+        data=ev_ctrl_arr,
+        dims=["control"],
+        coords={"control": list(conv_ds.keys())[:-1]},
+        attrs={
+            "units": "1",
+            "long_name": "explained variance for each control variable",
+            "short_name": "ev_ctrl",
+        },
+    )
+
+    return ev_ctrl
+
+
+def calc_variance(x: xr.DataArray) -> float:
+    if x.size == 0:
+        return np.nan
+    x = x.data
+    mean = np.mean(x)
+    variance = float(np.mean((x - mean) ** 2))
+    return variance

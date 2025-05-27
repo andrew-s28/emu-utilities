@@ -9,6 +9,11 @@ from .resample import resample_to_latlon
 
 
 class EMUSampling(EMU):
+    def __init__(self, run_directory: str) -> None:
+        super().__init__(run_directory)
+        if self.tool != "samp":
+            raise ValueError(f"Expected EMU tool 'samp', but got '{self.tool}' from directory: {self.run_name}")
+
     def make_sampling_dataset(self, samp_data, samp_mean, samp_dt) -> xr.Dataset:
         # Sampling variables (Set by rd_samp.py)
         self.samp_data = samp_data
@@ -17,7 +22,7 @@ class EMUSampling(EMU):
 
         samp_ds = xr.Dataset(
             data_vars={
-                self.variable: (["time"], samp_data),
+                self.variable: (["time"], samp_data + samp_mean),
             },
             coords={
                 "time": samp_dt,

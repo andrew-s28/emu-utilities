@@ -92,6 +92,7 @@ class EMUColvolution(EMU):
         self.spflx = self.get_conv_data("spflx")
         self.tauu = self.get_conv_data("tauu")
         self.tauv = self.get_conv_data("tauv")
+        self.sum = self.empmr + self.pload + self.qnet + self.qsw + self.saltflux + self.spflx + self.tauu + self.tauv
 
     def convert_to_tiles(self):
         self.empmr = llc_compact_to_tiles(self.empmr, less_output=True)

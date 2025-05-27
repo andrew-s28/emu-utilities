@@ -113,6 +113,7 @@ class EMU:
         self.hfacc = llc_compact_to_tiles(self.set_grid_data("hFacC.data", (self.nr, self.ny, self.nx)))
         self.hfacw = llc_compact_to_tiles(self.set_grid_data("hFacW.data", (self.nr, self.ny, self.nx)))
         self.hfacs = llc_compact_to_tiles(self.set_grid_data("hFacS.data", (self.nr, self.ny, self.nx)))
+        self.rac = llc_compact_to_tiles(self.set_grid_data("RAC.data", (self.ny, self.nx)))
 
     def set_grid_data(self, filename: str, dimensions: tuple):
         with files("emu_utilities.grid_data").joinpath(filename).open("rb") as f:

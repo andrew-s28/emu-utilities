@@ -56,9 +56,9 @@ class EMUColvolution(EMU):
         if self.nlags == 0:
             raise ValueError(f"No records found for variable '{variable}' in file: {conv_files[0]}")
         conv_data = conv_data.reshape((self.nlags, self.nweeks))
-        if variable in ["tauu", "tauv"]:
-            # convert to northward and eastward components
-            conv_data = -conv_data
+        # if variable in ["tauu", "tauv"]:
+        #     # convert to northward and eastward components
+        #     conv_data = -conv_data
         return conv_data
 
     def get_2d_conv_data(self, variable: str) -> NDArray[np.float32]:

@@ -14,8 +14,10 @@ This package is *very* early in development, so use with caution and please reac
 
 ### Installation
 
+Currently only cloning locally is supported:
+
 ```bash
-pip install emu-utilities
+git clone https://github.com/andrew-s28/emu-utilities.git
 ```
 
 ### Basic Import

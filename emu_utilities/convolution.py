@@ -58,9 +58,6 @@ class EMUColvolution(EMU):
         if self.nlags == 0:
             raise ValueError(f"No records found for variable '{variable}' in file: {conv_files[0]}")
         conv_data = conv_data.reshape((self.nlags, self.nweeks))
-        # if variable in ["tauu", "tauv"]:
-        #     # convert to northward and eastward components
-        #     conv_data = -conv_data
         return conv_data
 
     def get_2d_conv_data(self, variable: str) -> NDArray[np.float32]:
@@ -71,14 +68,7 @@ class EMUColvolution(EMU):
             )
         with open(conv_files[0], "rb") as f:
             conv_data = np.fromfile(f, dtype=">f4").astype(np.float32)
-        nlags = conv_data.size // (self.nx * self.ny)
-        self.nlags = nlags
-        if nlags == 0:
-            raise ValueError(f"No records found for variable '{variable}' in file: {conv_files[0]}")
-        conv_data = conv_data.reshape((nlags, self.ny, self.nx))
-        # if variable in ["tauu", "tauv"]:
-        #     # convert to northward and eastward components
-        #     conv_data = conv_data
+        conv_data = conv_data.reshape((self.nweeks, self.ny, self.nx))
         return conv_data
 
     def set_controls(self):
@@ -105,6 +95,7 @@ class EMUColvolution(EMU):
         self.spflx = llc_compact_to_tiles(self.spflx, less_output=True)
         self.tauu = llc_compact_to_tiles(self.tauu, less_output=True)
         self.tauv = llc_compact_to_tiles(self.tauv, less_output=True)
+        self.sum = llc_compact_to_tiles(self.sum, less_output=True)
 
     def get_control_metadata(self, variable: str) -> dict:
         metadata = {
@@ -131,10 +122,10 @@ class EMUColvolution(EMU):
             metadata["short_name"] = "net_downward_salt_plume_flux"
         elif variable == "tauu":
             metadata["units"] = "N/m^2"
-            metadata["short_name"] = "eastward_surface_stress"
+            metadata["short_name"] = "westward_surface_stress"
         elif variable == "tauv":
             metadata["units"] = "N/m^2"
-            metadata["short_name"] = "northward_surface_stress"
+            metadata["short_name"] = "southward_surface_stress"
         return metadata
 
     def make_2d_conv_gradient_dataset(self) -> xr.Dataset:
@@ -285,6 +276,42 @@ def ctrl_variance(conv_ds: xr.Dataset, lag: int = -1) -> xr.DataArray:
     return ev_ctrl
 
 
+def spatial_variance(conv_ds: xr.Dataset, variable: str) -> xr.DataArray:
+    if variable not in conv_ds.data_vars or "sum" not in conv_ds.data_vars or "time" not in conv_ds.dims:
+        raise ValueError(
+            f"Variable '{variable}' not found in dataset. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+        )
+    if "tile" not in conv_ds[variable].dims or "j" not in conv_ds[variable].dims or "i" not in conv_ds[variable].dims:
+        raise ValueError(
+            f"Incorrect dimensions on {variable}. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+        )
+    if "xc" not in conv_ds.coords or "yc" not in conv_ds.coords:
+        raise ValueError(
+            "Coordinates 'xc' and 'yc' not found in dataset. Make sure the dataset follows the output format of the emu_utilities.convolution module."
+        )
+    diff = conv_ds["sum"].sum(dim=["tile", "j", "i"]) - conv_ds[variable]
+    # spatial_var_arr = np.full((conv_ds.sizes["tile"], conv_ds.sizes["j"], conv_ds.sizes["i"]), np.nan)
+    spatial_var_arr = 1 - calc_spatial_variance(diff) / calc_variance(conv_ds["sum"].sum(dim=["tile", "j", "i"]))
+    spatial_var_arr_norm = np.divide(spatial_var_arr, EMU.get_model_grid("rac"))
+
+    spatial_var = xr.DataArray(
+        data=spatial_var_arr_norm,
+        dims=["tile", "j", "i"],
+        coords={
+            "tile": np.arange(conv_ds.sizes["tile"]),
+            "j": np.arange(conv_ds.sizes["j"]),
+            "i": np.arange(conv_ds.sizes["i"]),
+            "xc": (["tile", "j", "i"], conv_ds["xc"].data),
+            "yc": (["tile", "j", "i"], conv_ds["yc"].data),
+        },
+        attrs={
+            "long_name": f"spatial explained variance for {variable}",
+            "short_name": f"spatial_exp_var_{variable}",
+        },
+    )
+    return spatial_var
+
+
 def calc_variance(x: xr.DataArray) -> float:
     if x.size == 0:
         return np.nan
@@ -292,3 +319,12 @@ def calc_variance(x: xr.DataArray) -> float:
     mean = np.mean(x)
     variance = float(np.mean((x - mean) ** 2))
     return variance
+
+
+def calc_spatial_variance(x: xr.DataArray) -> float:
+    if x.size == 0:
+        return np.nan
+    x = x.data
+    mean = np.mean(x, axis=0)
+    spatial_variance = np.mean((x - mean) ** 2, axis=0)
+    return spatial_variance

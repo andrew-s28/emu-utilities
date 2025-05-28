@@ -100,22 +100,44 @@ class EMU:
                 raise ValueError(f"Short name not defined for variable: {self.variable}")
 
     def set_model_grid(self):
-        # Model grid variables (Set by rd_grid.py)
-        self.nx = 90
-        self.ny = 1170
-        self.nr = 50
-        self.ntiles = 13
-        self.xc = llc_compact_to_tiles(self.set_grid_data("XC.data", (self.ny, self.nx)))
-        self.yc = llc_compact_to_tiles(self.set_grid_data("YC.data", (self.ny, self.nx)))
-        self.rc = self.set_grid_data("RC.data", (self.nr,))
-        self.xg = llc_compact_to_tiles(self.set_grid_data("XG.data", (self.ny, self.nx)))
-        self.yg = llc_compact_to_tiles(self.set_grid_data("YG.data", (self.ny, self.nx)))
-        self.hfacc = llc_compact_to_tiles(self.set_grid_data("hFacC.data", (self.nr, self.ny, self.nx)))
-        self.hfacw = llc_compact_to_tiles(self.set_grid_data("hFacW.data", (self.nr, self.ny, self.nx)))
-        self.hfacs = llc_compact_to_tiles(self.set_grid_data("hFacS.data", (self.nr, self.ny, self.nx)))
-        self.rac = llc_compact_to_tiles(self.set_grid_data("RAC.data", (self.ny, self.nx)))
+        self.nx = EMU.get_model_grid("nx")
+        self.ny = EMU.get_model_grid("ny")
+        self.nr = EMU.get_model_grid("nr")
+        self.ntiles = EMU.get_model_grid("ntiles")
+        self.xc = EMU.get_model_grid("xc")
+        self.yc = EMU.get_model_grid("yc")
+        self.rc = EMU.get_model_grid("rc")
+        self.xg = EMU.get_model_grid("xg")
+        self.yg = EMU.get_model_grid("yg")
+        self.hfacc = EMU.get_model_grid("hfacc")
+        self.hfacw = EMU.get_model_grid("hfacw")
+        self.hfacs = EMU.get_model_grid("hfacs")
+        self.rac = EMU.get_model_grid("rac")
 
-    def set_grid_data(self, filename: str, dimensions: tuple):
+    @staticmethod
+    def get_model_grid(grid_var: str):
+        # Model grid variables (Set by rd_grid.py)
+        grid_data = {}
+        nx = 90
+        ny = 1170
+        nr = 50
+        grid_data["nx"] = nx
+        grid_data["ny"] = ny
+        grid_data["nr"] = nr
+        grid_data["ntiles"] = 13
+        grid_data["xc"] = llc_compact_to_tiles(EMU.get_grid_data("XC.data", (ny, nx)))
+        grid_data["yc"] = llc_compact_to_tiles(EMU.get_grid_data("YC.data", (ny, nx)))
+        grid_data["rc"] = EMU.get_grid_data("RC.data", (nr,))
+        grid_data["xg"] = llc_compact_to_tiles(EMU.get_grid_data("XG.data", (ny, nx)))
+        grid_data["yg"] = llc_compact_to_tiles(EMU.get_grid_data("YG.data", (ny, nx)))
+        grid_data["hfacc"] = llc_compact_to_tiles(EMU.get_grid_data("hFacC.data", (nr, ny, nx)))
+        grid_data["hfacw"] = llc_compact_to_tiles(EMU.get_grid_data("hFacW.data", (nr, ny, nx)))
+        grid_data["hfacs"] = llc_compact_to_tiles(EMU.get_grid_data("hFacS.data", (nr, ny, nx)))
+        grid_data["rac"] = llc_compact_to_tiles(EMU.get_grid_data("RAC.data", (ny, nx)))
+        return grid_data[grid_var]
+
+    @staticmethod
+    def get_grid_data(filename: str, dimensions: tuple):
         with files("emu_utilities.grid_data").joinpath(filename).open("rb") as f:
             data = np.fromfile(f, dtype=">f4").reshape(dimensions).astype(np.float64)
         return data

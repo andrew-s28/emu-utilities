@@ -134,6 +134,7 @@ class EMU:
         grid_data["hfacw"] = llc_compact_to_tiles(EMU.get_grid_data("hFacW.data", (nr, ny, nx)))
         grid_data["hfacs"] = llc_compact_to_tiles(EMU.get_grid_data("hFacS.data", (nr, ny, nx)))
         grid_data["rac"] = llc_compact_to_tiles(EMU.get_grid_data("RAC.data", (ny, nx)))
+        grid_data["drf"] = EMU.get_grid_data("DRF.data", (nr,))
         return grid_data[grid_var]
 
     @staticmethod

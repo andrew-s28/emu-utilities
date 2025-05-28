@@ -31,9 +31,6 @@ class EMUAdjointGradient(EMU):
         if nlags == 0:
             raise ValueError(f"No records found for variable '{variable}' in file: {adj_files[0]}")
         adj_data = adj_data.reshape((nlags, self.ny, self.nx))
-        # if variable in ["tauu", "tauv"]:
-        #     # convert to northward and eastward components
-        #     adj_data = -adj_data
         return adj_data
 
     def set_controls(self):
@@ -81,10 +78,10 @@ class EMUAdjointGradient(EMU):
             metadata["short_name"] = "net_downward_salt_plume_flux"
         elif variable == "tauu":
             metadata["units"] = "N/m^2"
-            metadata["short_name"] = "eastward_surface_stress"
+            metadata["short_name"] = "westward_surface_stress"
         elif variable == "tauv":
             metadata["units"] = "N/m^2"
-            metadata["short_name"] = "northward_surface_stress"
+            metadata["short_name"] = "southward_surface_stress"
         return metadata
 
     def make_adjoint_gradient_dataset(self) -> xr.Dataset:

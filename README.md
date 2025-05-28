@@ -1,6 +1,8 @@
 # emu-utilities
 
-**ECCO Modeling Utilities (EMU) - Utilities**: this package provides functions for loading the outputs of the [ECCO Modeling Utilities (EMU)](https://ecco-group.org/docs/01_16_fukumori_emu_ecco_2024_03.pdf) into [xarray](https://docs.xarray.dev/en/stable/) data structures. This package includes support for outputs from the following EMU tools:
+**ECCO Modeling Utilities (EMU) - Utilities**: *utilities for the utilities!*
+
+This package provides functions for loading the outputs of the [ECCO Modeling Utilities (EMU)](https://ecco-group.org/docs/01_16_fukumori_emu_ecco_2024_03.pdf) into [xarray](https://docs.xarray.dev/en/stable/) data structures. This package includes support for outputs from the following EMU tools:
 
 - **Adjoint Gradients**: Sensitivity of objective functions to control variables
 - **Attribution**: Decomposed contributions of different forcing components

@@ -88,8 +88,8 @@ class EMUFowardGradient(EMU):
                 {
                     "temp": (["time", "k", "tile", "j", "i"], temp_data),
                     "salt": (["time", "k", "tile", "j", "i"], salt_data),
-                    "uvel": (["time", "k", "tile", "j", "i"], uvel_data),
-                    "vvel": (["time", "k", "tile", "j", "i"], vvel_data),
+                    "uvel": (["time", "k", "tile", "j", "i_g"], uvel_data),
+                    "vvel": (["time", "k", "tile", "j_g", "i"], vvel_data),
                 }
             )
 
@@ -101,24 +101,27 @@ class EMUFowardGradient(EMU):
                 "k": np.arange(self.nr),
                 "j": np.arange(self.ny // self.ntiles),
                 "i": np.arange(self.nx),
+                "j_g": np.arange(self.ny // self.ntiles),
+                "i_g": np.arange(self.nx),
                 "xc": (["tile", "j", "i"], self.xc),
                 "yc": (["tile", "j", "i"], self.yc),
-                "xg": (["tile", "j", "i"], self.xg),
+                "xg": (["tile", "j_g", "i_g"], self.xg),
                 "yg": (["tile", "j", "i"], self.yg),
             },
         )
 
         mask = xr.DataArray(
-            data=self.hfacc[0],
-            dims=["tile", "j", "i"],
+            data=self.hfacc,
+            dims=["k", "tile", "j", "i"],
             coords={
+                "k": np.arange(self.nr),
                 "tile": np.arange(self.ntiles),
                 "j": np.arange(self.ny // self.ntiles),
                 "i": np.arange(self.nx),
             },
         )
 
-        fgrd_ds = fgrd_ds.where(mask > 0, drop=True)
+        fgrd_ds = fgrd_ds.where(mask > 0)
 
         fgrd_ds.attrs["created"] = str(datetime.now().isoformat())
         fgrd_ds.attrs["run_name"] = self.run_name

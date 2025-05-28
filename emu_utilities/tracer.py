@@ -79,6 +79,8 @@ class EMUTracerGradient(EMU):
 
         trcr_ds = trcr_ds.where(mask > 0)
 
+        trcr_ds["tracer_depth_integrated"] = (trcr_ds["tracer"] * mask).sum(dim="k", min_count=1)
+
         trcr_ds.attrs["created"] = str(datetime.now().isoformat())
         trcr_ds.attrs["run_name"] = self.run_name
         trcr_ds.attrs["tool"] = self.tool

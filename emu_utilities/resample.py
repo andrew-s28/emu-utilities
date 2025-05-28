@@ -13,6 +13,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 from __future__ import division, print_function
 
 from collections import OrderedDict
+import warnings
 
 import numpy as np
 import pyresample as pr
@@ -285,10 +286,21 @@ def resample_ds(
     data_vars = ds.keys()
     ds_out = ds.copy(deep=True)
     for data_var in data_vars:
-        if "tile" not in ds[data_var].dims or "j" not in ds[data_var].dims or "i" not in ds[data_var].dims:
+        if (
+            "tile" not in ds[data_var].dims
+            or ("j" not in ds[data_var].dims and "j_g" not in ds[data_var].dims)
+            or ("i" not in ds[data_var].dims and "i_g" not in ds[data_var].dims)
+        ):
             continue  # skip variables that don't have the right dimensions
-        orig_lons = ds[data_var].xc.values
-        orig_lats = ds[data_var].yc.values
+            warnings.warn(f"Skipping variable {data_var} as it does not have the required dimensions.")
+        if "i_g" in ds[data_var].dims:
+            orig_lons = ds[data_var].xg.values
+        else:
+            orig_lons = ds[data_var].xc.values
+        if "j_g" in ds[data_var].dims:
+            orig_lats = ds[data_var].yg.values
+        else:
+            orig_lats = ds[data_var].yc.values
         orig_field = ds[data_var].values
 
         orig_lats_1d = orig_lats.ravel()

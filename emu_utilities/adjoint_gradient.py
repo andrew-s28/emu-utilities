@@ -31,9 +31,9 @@ class EMUAdjointGradient(EMU):
         if nlags == 0:
             raise ValueError(f"No records found for variable '{variable}' in file: {adj_files[0]}")
         adj_data = adj_data.reshape((nlags, self.ny, self.nx))
-        if variable in ["tauu", "tauv"]:
-            # convert to northward and eastward components
-            adj_data = -adj_data
+        # if variable in ["tauu", "tauv"]:
+        #     # convert to northward and eastward components
+        #     adj_data = -adj_data
         return adj_data
 
     def set_controls(self):

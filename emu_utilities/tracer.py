@@ -63,6 +63,7 @@ class EMUTracerGradient(EMU):
                 "yc": (["tile", "j", "i"], self.yc),
                 "xg": (["tile", "j", "i"], self.xg),
                 "yg": (["tile", "j", "i"], self.yg),
+                "z": (["k"], self.rc),
             },
         )
 
@@ -84,9 +85,6 @@ class EMUTracerGradient(EMU):
         trcr_ds.attrs["created"] = str(datetime.now().isoformat())
         trcr_ds.attrs["run_name"] = self.run_name
         trcr_ds.attrs["tool"] = self.tool
-        # trcr_ds.attrs["variable"] = self.variable
-        # trcr_ds[self.variable].attrs["units"] = self.units
-        # trcr_ds[self.variable].attrs["short_name"] = self.short_name
 
         return trcr_ds
 

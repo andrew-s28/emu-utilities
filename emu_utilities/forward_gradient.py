@@ -107,6 +107,7 @@ class EMUFowardGradient(EMU):
                 "yc": (["tile", "j", "i"], self.yc),
                 "xg": (["tile", "j_g", "i_g"], self.xg),
                 "yg": (["tile", "j", "i"], self.yg),
+                "z": (["z"], self.rc),
             },
         )
 

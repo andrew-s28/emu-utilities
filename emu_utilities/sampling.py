@@ -47,7 +47,7 @@ def load_sample(run_directory: str) -> xr.Dataset:
     nrec = int(re.findall(r"\d+", samp_files[0].name)[0])
 
     with open(samp_files[0], "rb") as f:
-        samp_data = np.fromfile(f, dtype=">f4", count=nrec).astype(np.float64)
+        samp_data = np.fromfile(f, dtype=">f4", count=nrec).astype(np.float32)
         samp_mean = np.fromfile(f, dtype=">f4", count=1)[0]
 
     step_files = list(emu.directory.glob("output/samp.step_*"))

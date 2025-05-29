@@ -47,7 +47,7 @@ class EMUFowardGradient(EMU):
 
         for i, fgrd_file in enumerate(fgrd_2d_files):
             with open(fgrd_file, "rb") as f:
-                full_data = np.fromfile(f, dtype=">f4").astype(np.float64)
+                full_data = np.fromfile(f, dtype=">f4").astype(np.float32)
             ssh_data[i] = llc_compact_to_tiles(full_data[:data_2d_size].reshape((self.ny, self.nx)))
             obp_data[i] = llc_compact_to_tiles(full_data[data_2d_size : 2 * data_2d_size].reshape((self.ny, self.nx)))
 

@@ -140,7 +140,7 @@ class EMU:
     @staticmethod
     def get_grid_data(filename: str, dimensions: tuple):
         with files("emu_utilities.grid_data").joinpath(filename).open("rb") as f:
-            data = np.fromfile(f, dtype=">f4").reshape(dimensions).astype(np.float64)
+            data = np.fromfile(f, dtype=">f4").reshape(dimensions).astype(np.float32)
         return data
 
 

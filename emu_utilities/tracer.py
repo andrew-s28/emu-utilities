@@ -40,8 +40,7 @@ class EMUTracerGradient(EMU):
         drf = EMU.get_model_grid("drf")
         for i, trcr_file in enumerate(trcr_files):
             with open(trcr_file, "rb") as f:
-                full_data = np.fromfile(f, dtype=">f4")
-            # full_data = full_data.astype(np.float64)
+                full_data = np.fromfile(f, dtype=">f4").astype(np.float32)
             trcr_data[i] = llc_compact_to_tiles(full_data.reshape((self.nr, self.ny, self.nx)))
             # print(trcr_data[i].shape, hfacc.shape, drf.shape)
             for k in range(self.nr):

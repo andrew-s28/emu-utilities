@@ -32,7 +32,7 @@ class EMUAttribution(EMU):
         atrb_dt = datetime(1992, 1, 1, 0) + np.array([timedelta(hours=float(hr)) for hr in atrb_hr])
 
         with open(atrb_files[0], "rb") as f:
-            data = np.fromfile(f, dtype=">f4").astype(np.float64)
+            data = np.fromfile(f, dtype=">f4").astype(np.float32)
             means = data[-len(self.anomaly_variables) :]
             data = data[: -len(self.anomaly_variables)]
         atrb_data = data.reshape((len(self.anomaly_variables), atrb_dt.size))

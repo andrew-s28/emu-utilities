@@ -18,14 +18,14 @@ class EMUAdjointGradient(EMU):
         self.set_controls()
         self.convert_to_tiles()
 
-    def get_adjoint_data(self, variable: str) -> NDArray[np.float64]:
+    def get_adjoint_data(self, variable: str) -> NDArray[np.float32]:
         adj_files = list(self.directory.glob(f"output/adxx_{variable}.*.data"))
         if not adj_files:
             raise FileNotFoundError(
                 f"No adjoint data files found for variable '{variable}' in directory: {self.directory}"
             )
         with open(adj_files[0], "rb") as f:
-            adj_data = np.fromfile(f, dtype=">f4").astype(np.float64)
+            adj_data = np.fromfile(f, dtype=">f4").astype(np.float32)
         nlags = adj_data.size // (self.nx * self.ny)
         self.nlags = nlags
         if nlags == 0:

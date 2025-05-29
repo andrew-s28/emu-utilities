@@ -25,7 +25,7 @@ git clone https://github.com/andrew-s28/emu-utilities.git
 ### Basic Import
 
 ```python
-from emu_utilities import adjoint_gradient, attribution, convolution, forward_gradient, sampling
+from emu_utilities import adjoint_gradient, attribution, convolution, forward_gradient, sampling, tracer
 ```
 
 ### Loading Adjoint Gradient Data
@@ -100,12 +100,19 @@ plt.ylabel("THETA")
 plt.show()
 ```
 
+### Loading Tracer Data
+
+```python
+# Load tracer data from EMU output folder
+ds_trc = tracer.load_tracer_gradient("emu_trc_35_365_trc3d.-170.0_-120.0_-5.0_5.0_10.0_0.0")
+```
+
 ### Resampling to Regular Lat-Lon Grid
 
 EMU outputs are on the LLC-90 native ECCO grid. Any methods used to interpolate the central ECCO v4r4 state estimate fields to a regular lat-lon grid can be used here. A convinience method is included in this package, based on code from [ecco_v4_py](https://ecco-v4-python-tutorial.readthedocs.io/ECCO_v4_Interpolating_Fields_to_LatLon_Grid.html).
 
 ```python
-from emu_utilities.resample import resample_to_latlon
+from emu_utilities.resample import resample_ds
 
 # Load adjoint gradient data
 ds_adj = adjoint_gradient.load_adjoint_gradient("path/to/emu_adj_file")
@@ -119,11 +126,9 @@ new_grid_max_lat = 90
 new_grid_min_lon = -180
 new_grid_max_lon = 180
 
-# Example with adjoint gradient data - resampling tauu
-lon_c, lat_c, _, _, tauu_latlon = resample_to_latlon(
-    ds_adj.xc,
-    ds_adj.yc,
-    ds_adj.tauu,
+# Auto-magically resamples every variable in the dataset with the correct coordinates!
+ds_adj_resampled = resample_ds(
+    ds_adj
     new_grid_min_lat,
     new_grid_max_lat,
     new_grid_delta_lat,
@@ -136,7 +141,7 @@ lon_c, lat_c, _, _, tauu_latlon = resample_to_latlon(
 
 # Plot resampled data
 plt.figure(figsize=(12, 6))
-plt.pcolormesh(lon_c, lat_c, tauu_latlon[3], cmap="viridis")
+plt.pcolormesh(ds_adj_resampled["lon"], ds_adj_resampled["lat"], ds_adj_resampled["tauu"], cmap="viridis")
 plt.colorbar(label="tauu")
 plt.title("Resampled Zonal Wind Stress Sensitivity")
 plt.xlabel("Longitude")

@@ -276,7 +276,7 @@ def ctrl_variance(conv_ds: xr.Dataset, lag: int = -1) -> xr.DataArray:
     return ev_ctrl
 
 
-def spatial_variance(conv_ds: xr.Dataset, variable: str) -> xr.DataArray:
+def spatial_variance(conv_ds: xr.Dataset, variable: str, perarea: bool = True) -> xr.DataArray:
     if variable not in conv_ds.data_vars or "sum" not in conv_ds.data_vars or "time" not in conv_ds.dims:
         raise ValueError(
             f"Variable '{variable}' not found in dataset. Make sure the dataset follows the output format of the emu_utilities.convolution module."
@@ -292,7 +292,10 @@ def spatial_variance(conv_ds: xr.Dataset, variable: str) -> xr.DataArray:
     diff = conv_ds["sum"].sum(dim=["tile", "j", "i"]) - conv_ds[variable]
     # spatial_var_arr = np.full((conv_ds.sizes["tile"], conv_ds.sizes["j"], conv_ds.sizes["i"]), np.nan)
     spatial_var_arr = 1 - calc_spatial_variance(diff) / calc_variance(conv_ds["sum"].sum(dim=["tile", "j", "i"]))
-    spatial_var_arr_norm = np.divide(spatial_var_arr, EMU.get_model_grid("rac"))
+    if perarea:
+        spatial_var_arr_norm = np.divide(spatial_var_arr, EMU.get_model_grid("rac"))
+    else:
+        spatial_var_arr_norm = spatial_var_arr
 
     spatial_var = xr.DataArray(
         data=spatial_var_arr_norm,

@@ -14,8 +14,7 @@ CONTROLS = ["empmr", "pload", "qnet", "qsw", "saltflux", "spflx", "tauu", "tauv"
 class EMUColvolution(EMU):
     def __init__(self, directory: str, dims: int) -> None:
         super().__init__(directory)
-        if self.tool != "conv":
-            raise ValueError(f"Expected EMU tool 'conv', but got '{self.tool}' from directory: {self.run_name}")
+        self.validate_tool("conv")
         self.controls = CONTROLS
         self.dims = dims
         self.nweeks = 1357

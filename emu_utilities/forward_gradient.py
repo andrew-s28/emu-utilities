@@ -11,8 +11,7 @@ from .resample import llc_compact_to_tiles
 class EMUFowardGradient(EMU):
     def __init__(self, run_directory: str) -> None:
         super().__init__(run_directory)
-        if self.tool != "fgrd":
-            raise ValueError(f"Expected EMU tool 'fgrd', but got '{self.tool}' from directory: {self.run_name}")
+        self.validate_tool("fgrd")
 
     def make_forward_gradient_dataset(self, run_directory: str, daily: bool) -> xr.Dataset:
         if daily:

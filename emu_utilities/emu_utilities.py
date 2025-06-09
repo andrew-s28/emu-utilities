@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from importlib.resources import files
 from pathlib import Path
 
@@ -40,6 +41,13 @@ class EMU:
             self.tool = "atrb"
         else:
             raise ValueError(f"EMU tool not recognized from directory name: {self.run_name}")
+
+    def validate_tool(self, expected_tool):
+        """Ensure the EMU tool matches what's expected"""
+        if self.tool != expected_tool:
+            raise ValueError(
+                f"Expected EMU tool '{expected_tool}', but got '{self.tool}' from directory: {self.run_name}"
+            )
 
     def set_variable(self):
         if self.tool == "samp" or self.tool == "atrb":

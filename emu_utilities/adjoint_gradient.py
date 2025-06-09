@@ -12,8 +12,7 @@ from .resample import llc_compact_to_tiles
 class EMUAdjointGradient(EMU):
     def __init__(self, directory: str) -> None:
         super().__init__(directory)
-        if self.tool != "adj":
-            raise ValueError(f"Expected EMU tool 'adj', but got '{self.tool}' from directory: {self.run_name}")
+        self.validate_tool("adj")
         self.controls = ["empmr", "pload", "qnet", "qsw", "saltflux", "spflx", "tauu", "tauv"]
         self.set_controls()
         self.convert_to_tiles()
@@ -52,37 +51,6 @@ class EMUAdjointGradient(EMU):
         self.spflx = llc_compact_to_tiles(self.spflx, less_output=True)
         self.tauu = llc_compact_to_tiles(self.tauu, less_output=True)
         self.tauv = llc_compact_to_tiles(self.tauv, less_output=True)
-
-    def get_control_metadata(self, variable: str) -> dict:
-        metadata = {
-            "units": "unknown",
-            "short_name": "unknown",
-        }
-        if variable == "empmr":
-            metadata["units"] = "kg/m^2/s"
-            metadata["short_name"] = "upward_freshwater_flux"
-        elif variable == "pload":
-            metadata["units"] = "kg/m^2/s"
-            metadata["short_name"] = "downward_surface_pressure_loading"
-        elif variable == "qnet":
-            metadata["units"] = "W/m^2"
-            metadata["short_name"] = "net_upward_heat_flux"
-        elif variable == "qsw":
-            metadata["units"] = "W/m^2"
-            metadata["short_name"] = "net_upward_shortwave_radiation"
-        elif variable == "saltflux":
-            metadata["units"] = "kg/m^2/s"
-            metadata["short_name"] = "net_upward_salt_flux"
-        elif variable == "spflx":
-            metadata["units"] = "W/m^2"
-            metadata["short_name"] = "net_downward_salt_plume_flux"
-        elif variable == "tauu":
-            metadata["units"] = "N/m^2"
-            metadata["short_name"] = "westward_surface_stress"
-        elif variable == "tauv":
-            metadata["units"] = "N/m^2"
-            metadata["short_name"] = "southward_surface_stress"
-        return metadata
 
     def make_adjoint_gradient_dataset(self) -> xr.Dataset:
         data_vars = {var: (["lag", "tile", "j", "i"], getattr(self, var)) for var in self.controls}

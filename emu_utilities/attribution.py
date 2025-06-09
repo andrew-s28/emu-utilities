@@ -11,8 +11,7 @@ from .resample import resample_to_latlon
 class EMUAttribution(EMU):
     def __init__(self, run_directory: str) -> None:
         super().__init__(run_directory)
-        if self.tool != "atrb":
-            raise ValueError(f"Expected EMU tool 'atrb', but got '{self.tool}' from directory: {self.run_name}")
+        self.validate_tool("atrb")
         self.anomaly_variables = [
             "reference_run",
             "wind_stress",

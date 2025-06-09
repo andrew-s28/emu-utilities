@@ -12,12 +12,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 from __future__ import division, print_function
 
-from collections import OrderedDict
 import warnings
+from collections import OrderedDict
 
 import numpy as np
 import pyresample as pr
 import xarray as xr
+from numpy.typing import NDArray
 from xmitgcm.variables import dimensions
 
 
@@ -667,7 +668,7 @@ def llc_compact_to_faces(data_compact, less_output=False):
     return F
 
 
-def llc_faces_to_tiles(F, less_output=False):
+def llc_faces_to_tiles(F, less_output=False) -> NDArray:
     """
 
     Converts a dictionary, F, containing 5 lat-lon-cap faces into 13 tiles

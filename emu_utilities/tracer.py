@@ -1,95 +1,131 @@
-import re
-from datetime import datetime, timedelta
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import xarray as xr
 
-from .emu_utilities import EMU
+from .emu_utilities import EMU, find_time_from_file_names
 from .resample import llc_compact_to_tiles
+
+if TYPE_CHECKING:
+    from numpy import datetime64
+    from numpy.typing import NDArray
+
+__all__ = ["load_tracer"]
 
 
 class EMUTracerGradient(EMU):
-    def __init__(self, run_directory: str) -> None:
+    """Handles the loading and processing of EMU tracer data.
+
+    Processes tracer data from EMU tracer output files, converting raw binary
+    data into structured arrays and datasets with proper dimensions and coordinates.
+
+    Attributes:
+        mean: Whether to use monthly mean or snapshot tracer files.
+    """
+
+    def __init__(self, run_directory: str, mean: bool) -> None:
+        """Initialize the tracer gradient processor.
+
+        Args:
+            run_directory: Path to the EMU run directory.
+            mean: If True, use monthly mean files; if False, use snapshot files.
+
+        Raises:
+            ValueError: If the EMU tool type is not 'trc'.
+        """
         super().__init__(run_directory)
         if self.tool != "trc":
             raise ValueError(f"Expected EMU tool 'trcr', but got '{self.tool}' from directory: {self.run_name}")
+        self.mean = mean
 
-    def make_tracer_gradient_dataset(self, run_directory: str, mean: bool = True) -> xr.Dataset:
-        if mean:
-            trcr_files = list(self.directory.glob("output/ptracer_mon_mean.*.data"))
-        else:
-            trcr_files = list(self.directory.glob("output/ptracer_mon_snap.*.data"))
+    def find_time(self) -> NDArray[datetime64]:
+        """Extract timestamps from tracer file names.
 
-        hours = np.full(len(trcr_files), np.nan)
-        for i, trcr_file in enumerate(trcr_files):
-            full_match = re.search(r"\.(\d+)\.data", trcr_file.name)
-            if full_match:
-                hours[i] = int(full_match.group(1))
-            else:
-                raise ValueError(f"Could not extract hours from file name: {trcr_file.name}")
-        sort_idx = np.argsort(hours)
-        hours = hours[sort_idx]
-        trcr_files = [trcr_files[i] for i in sort_idx]
-        trcr_dt = datetime(1992, 1, 1, 0) + np.array([timedelta(hours=float(hr)) for hr in hours])
+        Returns:
+            Array of datetime64 objects representing available timestamps.
+        """
+        pattern = "output/ptracer_mon_mean.*.data" if self.mean else "output/ptracer_mon_snap.*.data"
+        return np.array(find_time_from_file_names(self.directory, pattern))
 
-        trcr_data = np.full(
-            (trcr_dt.size, self.nr, self.ntiles, self.ny // self.ntiles, self.nx), np.nan, dtype=np.float32
+    def load_data(self, trcr_files) -> NDArray[np.float32]:
+        """Load tracer data from binary files and apply appropriate scaling.
+
+        Applies vertical and horizontal area weights to correctly represent
+        the tracer concentration in each cell.
+
+        Args:
+            trcr_files: List of tracer data files to load.
+
+        Returns:
+            Structured array of tracer data with applied weights.
+        """
+        data = np.full(
+            (self.time.size, self.nr, self.ntiles, self.ny // self.ntiles, self.nx), np.nan, dtype=np.float32
         )
 
-        hfacc = EMU.get_model_grid("hfacc")
-        drf = EMU.get_model_grid("drf")
         for i, trcr_file in enumerate(trcr_files):
             with open(trcr_file, "rb") as f:
                 full_data = np.fromfile(f, dtype=">f4").astype(np.float32)
-            trcr_data[i] = llc_compact_to_tiles(full_data.reshape((self.nr, self.ny, self.nx)))
-            # print(trcr_data[i].shape, hfacc.shape, drf.shape)
+            data[i] = llc_compact_to_tiles(full_data.reshape((self.nr, self.ny, self.nx)))
             for k in range(self.nr):
-                trcr_data[i, k, :, :, :] = (
-                    trcr_data[i, k, :, :, :] * drf[k] * hfacc[k, :, :, :]
-                )  # Apply vertical and horizontal area weights
+                # Apply vertical and horizontal area weights to correctly represent tracer concentration
+                data[i, k, :, :, :] = (
+                    data[i, k, :, :, :] * self._coordinate_factory.drf[k] * self._coordinate_factory.hfacc[k, :, :, :]
+                )
 
-        trcr_ds = xr.Dataset(
-            data_vars={
-                "tracer": (["time", "k", "tile", "j", "i"], trcr_data),
-            },
-            coords={
-                "time": trcr_dt,
-                "k": np.arange(self.nr),
-                "tile": np.arange(self.ntiles),
-                "j": np.arange(self.ny // self.ntiles),
-                "i": np.arange(self.nx),
-                "xc": (["tile", "j", "i"], self.xc),
-                "yc": (["tile", "j", "i"], self.yc),
-                "xg": (["tile", "j", "i"], self.xg),
-                "yg": (["tile", "j", "i"], self.yg),
-                "z": (["k"], self.rc),
-            },
-        )
+        return data
 
-        mask = xr.DataArray(
-            data=self.hfacc,
-            dims=["k", "tile", "j", "i"],
-            coords={
-                "k": np.arange(self.nr),
-                "tile": np.arange(self.ntiles),
-                "j": np.arange(self.ny // self.ntiles),
-                "i": np.arange(self.nx),
-            },
-        )
+    def make_dataset(self) -> xr.Dataset:
+        """Create an xarray Dataset from tracer data.
 
-        trcr_ds = trcr_ds.where(mask > 0)
+        Processes tracer files, sorts by time, applies masks and creates
+        a properly structured dataset with metadata.
 
-        trcr_ds["tracer_depth_integrated"] = (trcr_ds["tracer"] * mask).sum(dim="k", min_count=1)
+        Returns:
+            Dataset containing tracer data with appropriate coordinates and metadata.
+        """
+        if self.mean:
+            trcr_files = list(self.directory.glob("output/ptracer_mon_mean.*.data"))
+        else:
+            trcr_files = list(self.directory.glob("output/ptracer_mon_snap.*.data"))
+        time_unsorted = self.find_time()
+        sort_idx = np.argsort(time_unsorted)
+        self.time = time_unsorted[sort_idx]
+        trcr_files = [trcr_files[i] for i in sort_idx]
 
-        trcr_ds.attrs["created"] = str(datetime.now().isoformat())
-        trcr_ds.attrs["run_name"] = self.run_name
-        trcr_ds.attrs["tool"] = self.tool
+        data = self.load_data(trcr_files)
 
-        return trcr_ds
+        coords = self._coordinate_factory.create_tile_coordinates(include_z=True, include_time=True, times=self.time)
+        data_vars = {
+            "tracer": (["time", "k", "tile", "j", "i"], data),
+        }
+        ds = self.create_base_dataset(data_vars, coords)
+
+        # Apply ocean mask to exclude land areas
+        mask = self._coordinate_factory.create_mask(include_z=True)
+        ds = ds.where(mask > 0)
+
+        # Calculate depth-integrated tracer values
+        ds["tracer_depth_integrated"] = (ds["tracer"] * mask).sum(dim="k", min_count=1)
+
+        return ds
 
 
-def load_tracer_gradient(run_directory: str, mean: bool = True) -> xr.Dataset:
-    emu = EMUTracerGradient(run_directory)
-    ds = emu.make_tracer_gradient_dataset(run_directory, mean)
+def load_tracer(run_directory: str, mean: bool = True) -> xr.Dataset:
+    """Load tracer data from an EMU run.
+
+    High-level function to load and process tracer data from an EMU run directory.
+
+    Args:
+        run_directory: Path to the EMU run directory.
+        mean: If True (default), use monthly mean files; if False, use snapshot files.
+
+    Returns:
+        Dataset containing processed tracer data.
+    """
+    emu = EMUTracerGradient(run_directory, mean)
+    ds = emu.make_dataset()
 
     return ds

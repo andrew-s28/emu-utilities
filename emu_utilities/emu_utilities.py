@@ -1,301 +1,338 @@
-from __future__ import division, print_function
+from __future__ import annotations, division, print_function
 
 import re
 from datetime import datetime, timedelta
 from importlib.resources import files
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import xarray as xr
-from pandas import date_range
 
-from .resample import llc_compact_to_tiles, resample_to_latlon
+from .resample import llc_compact_to_tiles
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from numpy import datetime64
+    from numpy.typing import NDArray
+
+__all__ = []
 
 
 class EMU:
+    """Base class for EMU (Estimating the Circulation and Climate of the Ocean Modeling Utilities) tools.
+
+    Provides common functionality for all EMU tools, including directory management,
+    tool identification, and dataset creation.
+
+    Attributes:
+        directory: Path to the EMU run directory.
+        run_name: Name of the run (directory basename).
+        tool: Type of EMU tool identified from the run name.
+        nx, ny, nr, ntiles: Grid dimensions.
+    """
+
     def __init__(self, directory: str) -> None:
+        """Initialize the EMU base class.
+
+        Args:
+            directory: Path to the EMU run directory.
+        """
         self.directory = Path(directory)
         self.run_name = self.directory.name
         self.set_tool()
-        self.set_variable()
-        self.set_units()
-        self.set_short_name()
-        self.set_model_grid()
+        self._coordinate_factory = CoordinateFactory()
+        self.nx = self._coordinate_factory.nx
+        self.ny = self._coordinate_factory.ny
+        self.nr = self._coordinate_factory.nr
+        self.ntiles = self._coordinate_factory.ntiles
 
     def set_tool(self) -> None:
+        """Determine the EMU tool type from the run directory name.
+
+        Sets the tool attribute based on identifiers in the run name.
+
+        Raises:
+            ValueError: If the EMU tool type cannot be determined.
+        """
         if "samp" in self.run_name:
-            self.tool = "samp"
+            self.tool = "samp"  # Sampling
         elif "fgrd" in self.run_name:
-            self.tool = "fgrd"
+            self.tool = "fgrd"  # Forward gradient
         elif "adj" in self.run_name:
-            self.tool = "adj"
+            self.tool = "adj"  # Adjoint gradient
         elif "conv" in self.run_name:
-            self.tool = "conv"
+            self.tool = "conv"  # Convolution
         elif "trc" in self.run_name:
-            self.tool = "trc"
+            self.tool = "trc"  # Tracer
         elif "budg" in self.run_name:
-            self.tool = "budg"
+            self.tool = "budg"  # Budget
         elif "msim" in self.run_name:
-            self.tool = "msim"
+            self.tool = "msim"  # Model simulation
         elif "atrb" in self.run_name:
-            self.tool = "atrb"
+            self.tool = "atrb"  # Attribution
         else:
             raise ValueError(f"EMU tool not recognized from directory name: {self.run_name}")
 
     def validate_tool(self, expected_tool):
-        """Ensure the EMU tool matches what's expected"""
+        """Ensure the EMU tool matches what's expected.
+
+        Args:
+            expected_tool: The expected tool identifier.
+
+        Raises:
+            ValueError: If the tool doesn't match the expected value.
+        """
         if self.tool != expected_tool:
             raise ValueError(
                 f"Expected EMU tool '{expected_tool}', but got '{self.tool}' from directory: {self.run_name}"
             )
 
-    def set_variable(self):
-        if self.tool == "samp" or self.tool == "atrb":
-            if "m_1_" in self.run_name or "d_1_" in self.run_name:
-                self.variable = "SSH"
-            elif "m_2_" in self.run_name or "d_2_" in self.run_name:
-                self.variable = "OBP"
-            elif "m_3_" in self.run_name or "d_3_" in self.run_name:
-                self.variable = "THETA"
-            elif "m_4_" in self.run_name or "d_4_" in self.run_name:
-                self.variable = "SALT"
-            elif "m_5_" in self.run_name or "d_5_" in self.run_name:
-                self.variable = "UV"
-            else:
-                raise ValueError(f"EMU variable not recognized from directory name: {self.run_name}")
-        if self.tool == "adj":
-            if self.run_name.endswith("_1"):
-                self.variable = "SSH"
-            elif self.run_name.endswith("_2"):
-                self.variable = "OBP"
-            elif self.run_name.endswith("_3"):
-                self.variable = "THETA"
-            elif self.run_name.endswith("_4"):
-                self.variable = "SALT"
-            elif self.run_name.endswith("_5"):
-                self.variable = "UV"
-            else:
-                raise ValueError(f"EMU variable not recognized from directory name: {self.run_name}")
+    def create_base_dataset(self, data_vars, coords, attrs=None):
+        """Create a dataset with standard EMU attributes.
 
-    def set_units(self):
-        if self.tool == "samp" or self.tool == "adj" or self.tool == "atrb":
-            if self.variable == "SSH":
-                self.units = "m"
-            elif self.variable == "OBP":
-                self.units = "m"
-            elif self.variable == "THETA":
-                self.units = "degree_C"
-            elif self.variable == "SALT":
-                self.units = "PSU"
-            elif self.variable == "UV":
-                self.units = "m/s"
-            else:
-                raise ValueError(f"Units not defined for variable: {self.variable}")
+        Args:
+            data_vars: Dictionary of data variables to include in the dataset.
+            coords: Dictionary of coordinates to include in the dataset.
+            attrs: Optional additional attributes to include.
 
-    def set_short_name(self):
-        if self.tool == "samp" or self.tool == "adj" or self.tool == "atrb":
-            if self.variable == "SSH":
-                self.short_name = "sea_surface_height"
-            elif self.variable == "OBP":
-                self.short_name = "ocean_bottom_pressure"
-            elif self.variable == "THETA":
-                self.short_name = "potential_temperature"
-            elif self.variable == "SALT":
-                self.short_name = "practical_salinity"
-            elif self.variable == "UV":
-                self.short_name = "ocean_velocity"
-            else:
-                raise ValueError(f"Short name not defined for variable: {self.variable}")
+        Returns:
+            xarray Dataset with standard EMU metadata.
+        """
+        ds = xr.Dataset(data_vars=data_vars, coords=coords)
 
-    def set_model_grid(self):
-        self.nx = EMU.get_model_grid("nx")
-        self.ny = EMU.get_model_grid("ny")
-        self.nr = EMU.get_model_grid("nr")
-        self.ntiles = EMU.get_model_grid("ntiles")
-        self.xc = EMU.get_model_grid("xc")
-        self.yc = EMU.get_model_grid("yc")
-        self.rc = EMU.get_model_grid("rc")
-        self.xg = EMU.get_model_grid("xg")
-        self.yg = EMU.get_model_grid("yg")
-        self.hfacc = EMU.get_model_grid("hfacc")
-        self.hfacw = EMU.get_model_grid("hfacw")
-        self.hfacs = EMU.get_model_grid("hfacs")
-        self.rac = EMU.get_model_grid("rac")
+        # Set standard attributes
+        ds.attrs["created"] = str(datetime.now().isoformat())
+        ds.attrs["run_name"] = self.run_name
+        ds.attrs["tool"] = self.tool
 
-    @staticmethod
-    def get_model_grid(grid_var: str):
-        # Model grid variables (Set by rd_grid.py)
-        grid_data = {}
-        nx = 90
-        ny = 1170
-        nr = 50
-        grid_data["nx"] = nx
-        grid_data["ny"] = ny
-        grid_data["nr"] = nr
-        grid_data["ntiles"] = 13
-        grid_data["xc"] = llc_compact_to_tiles(EMU.get_grid_data("XC.data", (ny, nx)))
-        grid_data["yc"] = llc_compact_to_tiles(EMU.get_grid_data("YC.data", (ny, nx)))
-        grid_data["rc"] = EMU.get_grid_data("RC.data", (nr,))
-        grid_data["xg"] = llc_compact_to_tiles(EMU.get_grid_data("XG.data", (ny, nx)))
-        grid_data["yg"] = llc_compact_to_tiles(EMU.get_grid_data("YG.data", (ny, nx)))
-        grid_data["hfacc"] = llc_compact_to_tiles(EMU.get_grid_data("hFacC.data", (nr, ny, nx)))
-        grid_data["hfacw"] = llc_compact_to_tiles(EMU.get_grid_data("hFacW.data", (nr, ny, nx)))
-        grid_data["hfacs"] = llc_compact_to_tiles(EMU.get_grid_data("hFacS.data", (nr, ny, nx)))
-        grid_data["rac"] = llc_compact_to_tiles(EMU.get_grid_data("RAC.data", (ny, nx)))
-        grid_data["drf"] = EMU.get_grid_data("DRF.data", (nr,))
-        return grid_data[grid_var]
+        # Add any additional attributes
+        if attrs:
+            for key, value in attrs.items():
+                ds.attrs[key] = value
 
-    @staticmethod
-    def get_grid_data(filename: str, dimensions: tuple):
+        return ds
+
+    def get_control_metadata(self, variable: str) -> dict:
+        """Get standard metadata for a control variable.
+
+        Args:
+            variable: Name of the control variable.
+
+        Returns:
+            Dictionary containing standard metadata (units, short_name).
+        """
+        metadata = {
+            "units": "unknown",
+            "short_name": "unknown",
+        }
+        metadata_map = {
+            "empmr": {"units": "kg/m^2/s", "short_name": "upward_freshwater_flux"},
+            "pload": {"units": "kg/m^2/s", "short_name": "downward_surface_pressure_loading"},
+            "qnet": {"units": "W/m^2", "short_name": "net_upward_heat_flux"},
+            "qsw": {"units": "W/m^2", "short_name": "net_upward_shortwave_radiation"},
+            "saltflux": {"units": "kg/m^2/s", "short_name": "net_upward_salt_flux"},
+            "spflx": {"units": "W/m^2", "short_name": "net_downward_salt_plume_flux"},
+            "tauu": {"units": "N/m^2", "short_name": "westward_surface_stress"},
+            "tauv": {"units": "N/m^2", "short_name": "southward_surface_stress"},
+        }
+        if variable in metadata_map:
+            return metadata_map[variable]
+        return metadata
+
+
+class CoordinateFactory:
+    """Factory for creating standard coordinate systems for EMU datasets.
+
+    Manages the loading of grid data and creation of coordinate arrays
+    for various grid configurations (cell centers, edges, etc.).
+
+    Attributes:
+        nx, ny, nr, ntiles: Grid dimensions.
+        xc, yc, rc: Cell center coordinates.
+        xg, yg: Cell corner (grid) coordinates.
+        hfacc, hfacw, hfacs: Cell fraction factors.
+        rac: Cell areas.
+        drf: Vertical cell thicknesses.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the coordinate factory and load grid data."""
+        self.set_model_grid()
+
+    def set_model_grid(self) -> None:
+        """Load model grid data from embedded resources.
+
+        Sets up all grid-related attributes (dimensions, coordinates, masks).
+        """
+        self.nx = 90
+        self.ny = 1170
+        self.nr = 50
+        self.ntiles = 13
+        self.xc = llc_compact_to_tiles(self.load_grid_data("XC.data", (self.ny, self.nx)))
+        self.yc = llc_compact_to_tiles(self.load_grid_data("YC.data", (self.ny, self.nx)))
+        self.rc = self.load_grid_data("RC.data", (self.nr,))
+        self.xg = llc_compact_to_tiles(self.load_grid_data("XG.data", (self.ny, self.nx)))
+        self.yg = llc_compact_to_tiles(self.load_grid_data("YG.data", (self.ny, self.nx)))
+        self.hfacc = llc_compact_to_tiles(self.load_grid_data("hFacC.data", (self.nr, self.ny, self.nx)))
+        self.hfacw = llc_compact_to_tiles(self.load_grid_data("hFacW.data", (self.nr, self.ny, self.nx)))
+        self.hfacs = llc_compact_to_tiles(self.load_grid_data("hFacS.data", (self.nr, self.ny, self.nx)))
+        self.rac = llc_compact_to_tiles(self.load_grid_data("RAC.data", (self.ny, self.nx)))
+        self.drf = self.load_grid_data("DRF.data", (self.nr,))
+
+    def load_grid_data(self, filename: str, dimensions: tuple):
+        """Load grid data from resource files.
+
+        Args:
+            filename: Name of the grid data file to load.
+            dimensions: Tuple of dimensions to reshape the data.
+
+        Returns:
+            Numpy array containing the grid data.
+        """
         with files("emu_utilities.grid_data").joinpath(filename).open("rb") as f:
             data = np.fromfile(f, dtype=">f4").reshape(dimensions).astype(np.float32)
         return data
 
+    def create_tile_coordinates(
+        self,
+        include_z: bool = False,
+        include_g: bool = False,
+        include_time: bool = False,
+        times: list[datetime] | NDArray[datetime64] | None = None,
+        include_lag: bool = False,
+        lags: list[int] | NDArray[np.int32] | None = None,
+    ) -> dict[str, Any]:
+        """Create standard tile-based coordinates for datasets.
 
-def load_output(pathname: str, grid: xr.Dataset, interp: bool = True) -> xr.Dataset:
-    vnames = ["empmr", "pload", "qnet", "qsw", "saltflux", "spflx", "tauu", "tauv"]
-    adj_full = []
+        Args:
+            include_z: Whether to include vertical coordinates.
+            include_g: Whether to include grid-point (corner) coordinates.
+            include_time: Whether to include time coordinates.
+            times: List of time values if include_time is True.
+            include_lag: Whether to include lag coordinates.
+            lags: List of lag values if include_lag is True.
 
-    for vname in vnames:
-        fname = f"{pathname}/output/adxx_{vname}.0000000129.data"
-        adjfile = np.fromfile(fname, dtype=">f4")
+        Returns:
+            Dictionary of coordinate arrays suitable for xarray datasets.
+        """
+        coords = {
+            "tile": np.arange(self.ntiles),
+            "j": np.arange(self.ny // self.ntiles),
+            "i": np.arange(self.nx),
+            "xc": (["tile", "j", "i"], self.xc),
+            "yc": (["tile", "j", "i"], self.yc),
+        }
 
-        nx = 90
-        ny = 1170
-        nt = adjfile.shape[0] // nx // ny
-        adj_tiles = llc_compact_to_tiles(adjfile.reshape(nt, ny, nx))
-        if (vname == "tauu") | (vname == "tauv"):
-            adj_tiles = -1 * adj_tiles  # switch to positive eastward convention
+        if include_g:
+            coords["j_g"] = np.arange(self.ny // self.ntiles)
+            coords["i_g"] = np.arange(self.nx)
+            coords["xg"] = (["tile", "j_g", "i_g"], self.xg)
+            coords["yg"] = (["tile", "j_g", "i"], self.yg)
 
-        # Regrid tile data to lat/lon using nearest neighbor
+        if include_z:
+            coords["z"] = (["k"], self.rc)
+            coords["k"] = np.arange(len(self.rc))
 
-        new_grid_delta_lat = 1
-        new_grid_delta_lon = 1
+        if include_time and times is not None:
+            # prepend times to coords dict for correct ordering in xarray
+            times_dict = {"time": times}
+            coords = {**times_dict, **coords}
 
-        new_grid_min_lat = -90
-        new_grid_max_lat = 90
+        if include_lag and lags is not None:
+            # prepend lags to coords dict for correct ordering in xarray
+            lags_dict = {"lag": lags}
+            coords = {**lags_dict, **coords}
 
-        new_grid_min_lon = -180
-        new_grid_max_lon = 180
+        return coords
 
-        if interp:
-            lons, lats, new_grid_lon_edges, new_grid_lat_edges, adj_rg = resample_to_latlon(
-                grid.XC,
-                grid.YC,
-                adj_tiles,
-                new_grid_min_lat,
-                new_grid_max_lat,
-                new_grid_delta_lat,
-                new_grid_min_lon,
-                new_grid_max_lon,
-                new_grid_delta_lon,
-                fill_value=np.nan,
-                mapping_method="nearest_neighbor",
-                radius_of_influence=120000,
+    def create_mask(self, include_z: bool = False, i_g: bool = False, j_g: bool = False) -> xr.DataArray:
+        """Create standard ocean mask based on hFacC.
+
+        Creates a mask to separate ocean from land areas, optionally
+        for different grid locations.
+
+        Args:
+            include_z: Whether to include the vertical dimension.
+            i_g: Whether to use i-direction grid points instead of centers.
+            j_g: Whether to use j-direction grid points instead of centers.
+
+        Returns:
+            DataArray containing the mask values (>0 for ocean).
+        """
+        if include_z:
+            da = xr.DataArray(
+                data=self.hfacc,
+                dims=["k", "tile", "j", "i"],
+                coords={
+                    "k": np.arange(self.nr),
+                    "tile": np.arange(self.ntiles),
+                    "j": np.arange(self.ny // self.ntiles),
+                    "i": np.arange(self.nx),
+                },
             )
-            adj_full.append(
-                xr.DataArray(
-                    adj_rg,
-                    dims=("lag", "lat", "lon"),
-                    coords=dict(
-                        lag=(["lag"], np.arange(nt - 1, -1, -1)), lon=(["lon"], lons[0]), lat=(["lat"], lats[:, 0])
-                    ),
-                    name=vname,
-                )
-            )
-
         else:
-            adj_full.append(
-                xr.DataArray(
-                    adj_tiles,
-                    dims=("lag", "tile", "x", "y"),
-                    coords=dict(
-                        lag=(["lag"], np.arange(nt - 1, -1, -1)),
-                        tile=(["tile"], np.arange(13)),
-                        x=(["x"], np.arange(90)),
-                        y=(["y"], np.arange(90)),
-                    ),
-                    name=vname,
-                )
+            da = xr.DataArray(
+                data=self.hfacc[0],  # Surface level only
+                dims=["tile", "j", "i"],
+                coords={
+                    "tile": np.arange(self.ntiles),
+                    "j": np.arange(self.ny // self.ntiles),
+                    "i": np.arange(self.nx),
+                },
             )
+        da = da.rename({"j": "j_g"}) if j_g else da
+        da = da.rename({"i": "i_g"}) if i_g else da
+        return da
 
-    return xr.merge(adj_full)
 
+def find_time_from_file(directory: Path, glob_pattern: str) -> list[datetime]:
+    """Extract timestamps stored inside a binary file.
 
-def get_ecco_forcing(varname, input_dir=None):
+    Args:
+        directory: Directory containing files.
+        glob_pattern: Pattern to match files (e.g., "output/*.data").
+
+    Returns:
+        List of datetime objects corresponding to the timestamps in the files.
     """
-    Read in 6-hourly variables from ecco forcing set on LLC90 grid
+    files = list(directory.glob(glob_pattern))
+    hours = np.full(len(files), np.nan)
 
-    Possible varnames are: atmPload, oceFWflx, oceQsw, oceSflux, oceSPflx, oceTAUE, oceTAUN, oceTAUX, oceTAUY, sIceLoad, sIceLoadPatmPload, sIceLoadPatmPload_nopabar, TFLUX
+    # only one file expected, read the first one
+    with open(files[0], "rb") as f:
+        hours = np.fromfile(f, dtype=">i4")
 
+    # convert hours to datetime objects (from 1992-01-01 reference date)
+    datetimes = [datetime(1992, 1, 1, 0) + timedelta(hours=float(hr)) for hr in hours]
+
+    return datetimes
+
+
+def find_time_from_file_names(directory: Path, glob_pattern: str, time_regex: str = r"\.(\d+)\.data") -> list[datetime]:
+    """Extract timestamps from file names using a regex pattern.
+
+    Args:
+        directory: Directory containing files.
+        glob_pattern: Pattern to match files (e.g., "output/*.data").
+        time_regex: Regular expression to extract timestamp from file names.
+
+    Returns:
+        List of datetime objects corresponding to the timestamps in the file names.
     """
-    if input_dir == None:
-        input_dir = "/glade/work/noahrose/MITGCM/MITgcm/ECCOV4/ecco.jpl.nasa.gov/drive/files/Version4/Release4/other/flux-forced/forcing"
+    files = list(directory.glob(glob_pattern))
+    hours = np.full(len(files), np.nan)
 
-    arr_ecco = []
-    for yr in range(1992, 2018):
-        test = np.fromfile(input_dir + f"/{varname}_6hourlyavg_{yr}", ">f4")
-        nx = 90
-        ny = 1170
-        nt = test.shape[0] // nx // ny
-        print(nt)
-        test_tiles = llc_compact_to_tiles(test.reshape(nt, ny, nx))
-        arr_ecco.append(test_tiles)
+    # Extract time from file names using regex
+    for i, file in enumerate(files):
+        match = re.search(time_regex, file.name)
+        if match:
+            hours[i] = int(match.group(1))
+        else:
+            raise ValueError(f"Could not extract time from filename: {file.name}")
 
-    arr_ecco = np.concatenate(arr_ecco)
+    # convert hours to datetime objects (from 1992-01-01 reference date)
+    datetimes = [datetime(1992, 1, 1, 0) + timedelta(hours=float(hr)) for hr in hours]
 
-    return arr_ecco
-
-
-def remove_cycles(data, seasonal=True, diurnal=True):
-    if data.ndim != 2:
-        data = data.reshape(-1, np.prod(data.shape[1:]))
-
-    dr = date_range(start="01-01-1992t00:00", periods=data.shape[0], freq="6h")
-
-    data_xr = xr.DataArray(data=data, coords=[dr, np.arange(data.shape[1])], dims=["time", "x"])
-
-    if seasonal:
-        data_xr = data_xr.groupby("time.month") - data_xr.groupby("time.month").mean("time")
-    if diurnal:
-        data_xr = data_xr.groupby("time.hour") - data_xr.groupby("time.hour").mean("time")
-
-    return data_xr.to_numpy()
-
-
-def UXVYfromUEVN(e_fld, n_fld, grid):
-    """
-    Compute the x and y components of a vector field defined
-    by its zonal (eastward) and meridional (northward) components
-    with respect to the model grid orientation.
-
-    Parameters
-    ----------
-    e_fld, n_fld : xarray DataArray
-        Zonal (positive east) and meridional (positive north) components
-        of a vector field provided at grid cell centers.
-
-
-    grid : xarray Dataset
-        Must contain 'CS' (cosine of grid orientation) and 'SN' (sine of grid orientation).
-
-    Returns
-    -------
-    x_fld, y_fld : xarray DataArray
-        x and y components of the input vector field aligned with the model grid.
-    """
-
-    # Check to make sure 'CS' and 'SN' are in coords
-    required_fields = ["CS", "SN"]
-    for var in required_fields:
-        if var not in grid.variables:
-            raise KeyError(f"Could not find {var} in coords Dataset")
-
-    # Perform the inverse rotation
-    x_fld = e_fld * grid["CS"] + n_fld * grid["SN"]
-    y_fld = -e_fld * grid["SN"] + n_fld * grid["CS"]
-
-    x_fld = x_fld.rename({"i": "i_g"})
-    y_fld = y_fld.rename({"j": "j_g"})
-
-    return x_fld, y_fld
+    return datetimes

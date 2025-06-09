@@ -1,61 +1,102 @@
+from __future__ import annotations
+
 import re
-from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import numpy as np
 import xarray as xr
 
-from .emu_utilities import EMU
-from .resample import resample_to_latlon
+from .emu_utilities import EMU, find_time_from_file
+
+if TYPE_CHECKING:
+    from numpy import datetime64
+    from numpy.typing import NDArray
+
+__all__ = ["load_sample"]
 
 
 class EMUSampling(EMU):
+    """Handles loading and processing of EMU sampling data.
+
+    Manages sampling data from EMU experiments, which represent time series
+    data at specific sampling points or regions of interest.
+    """
+
     def __init__(self, run_directory: str) -> None:
+        """Initialize the sampling data processor.
+
+        Args:
+            run_directory: Path to the EMU run directory.
+
+        Raises:
+            ValueError: If the EMU tool type is not 'samp'.
+        """
         super().__init__(run_directory)
         self.validate_tool("samp")
+        self.time = self.find_time()
 
-    def make_sampling_dataset(self, samp_data, samp_mean, samp_dt) -> xr.Dataset:
-        # Sampling variables (Set by rd_samp.py)
-        self.samp_data = samp_data
-        self.samp_mean = samp_mean
-        self.samp_dt = samp_dt
+    def find_time(self) -> NDArray[datetime64]:
+        """Extract timestamps from sampling step files.
 
-        samp_ds = xr.Dataset(
-            data_vars={
-                self.variable: (["time"], samp_data + samp_mean),
-            },
-            coords={
-                "time": samp_dt,
-            },
-        )
-        samp_ds.attrs["created"] = str(datetime.now().isoformat())
-        samp_ds.attrs["run_name"] = self.run_name
-        samp_ds.attrs["tool"] = self.tool
-        samp_ds.attrs["variable"] = self.variable
-        samp_ds[self.variable].attrs["units"] = self.units
-        samp_ds[self.variable].attrs["short_name"] = self.short_name
+        Returns:
+            Array of datetime64 objects representing available timestamps.
+        """
+        return np.array(find_time_from_file(self.directory, "output/samp.step_*"))
 
-        return samp_ds
+    def load_data(self) -> NDArray[np.float32]:
+        """Load sampling data from binary files.
+
+        Combines the raw data with the mean value to get the final sampling values.
+
+        Returns:
+            Array of sampling data values.
+
+        Raises:
+            FileNotFoundError: If no sampling data files are found.
+        """
+        samp_files = list(self.directory.glob("output/samp.out_*"))
+        if not samp_files:
+            raise FileNotFoundError(f"No sampling data files found in directory: {self.directory}")
+
+        # Extract number of records from file name
+        nrec = int(re.findall(r"\d+", samp_files[0].name)[0])
+        with open(samp_files[0], "rb") as f:
+            samp_data = np.fromfile(f, dtype=">f4", count=nrec).astype(np.float32)
+            # Mean value is appended to the end of the file
+            samp_mean = np.fromfile(f, dtype=">f4", count=1)[0]
+
+        # Add mean back to data to get absolute values
+        return samp_data + samp_mean
+
+    def make_dataset(self) -> xr.Dataset:
+        """Create an xarray Dataset from sampling data.
+
+        Returns:
+            Dataset containing sampling data with time coordinates.
+        """
+        data_vars = {
+            "var": (["time"], self.load_data()),
+        }
+        coords = {
+            "time": self.time,
+        }
+
+        ds = self.create_base_dataset(data_vars, coords)
+
+        return ds
 
 
 def load_sample(run_directory: str) -> xr.Dataset:
+    """Load sampling data from an EMU run.
+
+    High-level function to load and process sampling data from an EMU run directory.
+
+    Args:
+        run_directory: Path to the EMU run directory.
+
+    Returns:
+        Dataset containing processed sampling data.
+    """
     emu = EMUSampling(run_directory)
-    if emu.tool != "samp":
-        raise ValueError(f"Expected EMU tool 'samp', but got '{emu.tool}' from directory: {run_directory}")
-
-    samp_files = list(emu.directory.glob("output/samp.out_*"))
-    nrec = int(re.findall(r"\d+", samp_files[0].name)[0])
-
-    with open(samp_files[0], "rb") as f:
-        samp_data = np.fromfile(f, dtype=">f4", count=nrec).astype(np.float32)
-        samp_mean = np.fromfile(f, dtype=">f4", count=1)[0]
-
-    step_files = list(emu.directory.glob("output/samp.step_*"))
-
-    with open(step_files[0], "rb") as f:
-        samp_hr = np.fromfile(f, dtype=">i4", count=nrec)
-
-    samp_dt = datetime(1992, 1, 1, 0) + np.array([timedelta(hours=float(hr)) for hr in samp_hr])
-
-    samp_ds = emu.make_sampling_dataset(samp_data, samp_mean, samp_dt)
-
+    samp_ds = emu.make_dataset()
     return samp_ds

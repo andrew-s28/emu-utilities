@@ -1,7 +1,6 @@
 ### User specified ###
 *.ipynb
 *_test.py
-*.pdf
 
 # Python-generated files
 __pycache__/

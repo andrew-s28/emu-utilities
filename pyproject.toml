@@ -1,18 +1,50 @@
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
 [project]
 name = "emu-utilities"
-version = "0.1.0"
-description = "Add your description here"
+dynamic = ["version"]
+description = "Utilities for working with the outputs of the ECCO Modeling Utilities software."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 dependencies = [
-    "numpy>=2.2.6",
-    "pyresample>=1.34.1",
-    "xarray[io]>=2025.4.0",
+    "numpy>=2.0.2",
+    "pyresample>=1.31.0",
+    "xarray[io]>=2024.7.0",
     "xmitgcm>=0.5.2",
 ]
+authors = [{ name = 'Andrew Scherer', email = 'scherand@oregonstate.edu' }]
+maintainers = [{ name = 'Andrew Scherer', email = 'scherand@oregonstate.edu' }]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["ecco", "oceanography", "climate"]
+
+[project.urls]
+Homepage = "https://github.com/andrew-s28/emu-utilities"
+Repository = "https://github.com/andrew-s28/emu-utilities"
+Issues = "https://github.com/andrew-s28/emu-utilities/issues"
 
 [tool.ruff.lint.isort]
-known-first-party = ["emu_utilities", "resample"]
+known-first-party = ["emu_utilities", "grid_data"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+fallback-version = "0.0.0"
 
 [dependency-groups]
-viz = ["ipykernel>=6.29.5", "matplotlib>=3.10.3"]
+viz = ["ipykernel>=6.29.5", "matplotlib>=3.9.4"]

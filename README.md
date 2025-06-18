@@ -1,22 +1,35 @@
 # emu-utilities
 
+![PyPI - Version](https://img.shields.io/pypi/v/emu-utilities)
+
 **ECCO Modeling Utilities (EMU) - Utilities**: *utilities for the utilities!*
 
 This package provides functions for loading the outputs of the [ECCO Modeling Utilities (EMU)](https://ecco-group.org/docs/01_16_fukumori_emu_ecco_2024_03.pdf) into [xarray](https://docs.xarray.dev/en/stable/) data structures. This package includes support for outputs from the following EMU tools:
 
-- **Adjoint Gradients**: Sensitivity of objective functions to control variables
-- **Attribution**: Decomposed contributions of different forcing components
-- **Convolution**: Time-lagged correlations between forcing and response
-- **Forward Gradients**: Response of the model to perturbations
+- **Adjoint Gradients**: Sensitivity of objective functions to forcings
+- **Attribution**: Contributions of different forcing components to objective function
+- **Convolution**: Computes objective function from adjoints
+- **Forward Gradients**: Response of the model to perturbations in forcings
 - **Sampling**: Time series extraction at specific locations
+- **Tracer**: Forward and adjoint simulation of a passive tracer release
 
-This package is *very* early in development, so use with caution and please reach out or submit an issue if you notice any problems.
+This package is early in development, so use with caution and please reach out or submit an issue if you notice any problems.
 
 ## Usage
 
 ### Installation
 
-Currently only cloning locally is supported:
+This package can be installed from [PyPI](https://pypi.org/project/emu-utilities/) with uv (recommended) or pip:
+
+```bash
+uv add emu-utilities
+```
+
+```bash
+pip install emu-utilities
+```
+
+The most up-to-date version can be obtained by cloning the package repository locally:
 
 ```bash
 git clone https://github.com/andrew-s28/emu-utilities.git
@@ -54,11 +67,11 @@ plt.show()
 
 ### Loading Convolution Data
 
-Convolution outputs both 1d (spatial sum) and 2d (maximum lag) datasets which have to be loaded in differently. Several helper methods can then be used to compute the explained variance from either the 1d or 2d datasets.
+Convolution outputs both 1d (spatially-summed at all lags) and 2d (spatially-varying at maximum lag) datasets which have to be loaded in differently. Several helper methods can then be used to compute the explained variance from either the 1d or 2d datasets.
 
 ```python
 # Load 1d convolution data from EMU output folder
-ds_conv = convolution.load_1d_conv_gradient("emu_conv_6_6_2_45_585_1_26")
+ds_conv = convolution.load_1d_convolution("emu_conv_6_6_2_45_585_1_26")
 
 # Calculate and plot explained variance at a specific lag as a function of control variable
 convolution.ctrl_variance(ds_conv, lag=10).plot.scatter()
@@ -69,7 +82,7 @@ convolution.lagged_variance(ds_conv, variable="sum").plot.scatter()
 
 ```python
 # Load 2d convolution data from EMU output folder
-ds_conv = convolution.load_2d_conv_gradient("emu_conv_6_6_2_45_585_1_26")
+ds_conv = convolution.load_2d_convolution("emu_conv_6_6_2_45_585_1_26")
 
 # Calculate explained variance as a function of space
 ds_sp_var = convolution.spatial_variance(ds, "sum")
@@ -105,6 +118,9 @@ plt.show()
 ```python
 # Load tracer data from EMU output folder
 ds_trc = tracer.load_tracer_gradient("emu_trc_35_365_trc3d.-170.0_-120.0_-5.0_5.0_10.0_0.0")
+
+# Print dataset to explore available variables
+print(ds_trc)
 ```
 
 ### Resampling to Regular Lat-Lon Grid
@@ -182,14 +198,21 @@ plt.show()
 As this package is in early development, contributions are welcome! Here's how you can help:
 
 1. Report bugs by [opening an issue](link-to-issues)
+
 2. Suggest enhancements or new features
+
 3. Submit pull requests with improvements
 
 If you're interested in contributing, please:
-1. Fork the repository
+
+1. Fork and clone the repository
+
 2. Create a feature branch (`git checkout -b feature/your-feature`)
+
 3. Commit your changes (`git commit -m 'Add your feature'`)
+
 4. Push to the branch (`git push origin feature/your-feature`)
+
 5. Open a Pull Request
 
 ## License

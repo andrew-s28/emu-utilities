@@ -1,6 +1,6 @@
 # emu-utilities
 
-![PyPI - Version](https://img.shields.io/pypi/v/emu-utilities)
+[![PyPI - Version](https://img.shields.io/pypi/v/emu-utilities)](https://pypi.org/project/emu-utilities/)
 
 **ECCO Modeling Utilities (EMU) - Utilities**: *utilities for the utilities!*
 
